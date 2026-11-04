@@ -39,46 +39,89 @@ class ModelAdapter:
         raise NotImplementedError
 
 class OpenAIAdapter(ModelAdapter):
-    def __init__(self, api_key: str, model_name: str = "gemini-1.5-flash", base_url: Optional[str] = None):
+    def __init__(
+        self,
+        api_key: str,
+        model_name: str = "gemini-2.5-flash",
+        base_url: Optional[str] = None,
+        fallback_models: Optional[List[str]] = None,
+        secondary_adapter: Optional[ModelAdapter] = None
+    ):
         from openai import OpenAI
         self.model_name = model_name
         self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.fallback_models = fallback_models or []
+        self.secondary_adapter = secondary_adapter
 
     def generate(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> NormalizedResponse:
-        resp = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            tools=tools if tools else None,
-            temperature=0.1
-        )
-        choice = resp.choices[0]
-        msg = choice.message
+        from openai import NotFoundError
 
-        normalized_calls = []
-        if msg.tool_calls:
-            for tc in msg.tool_calls:
-                try:
-                    args = json.loads(tc.function.arguments)
-                except Exception:
-                    args = {}
-                normalized_calls.append(NormalizedToolCall(
-                    id=tc.id or f"call_{tc.function.name}",
-                    name=tc.function.name,
-                    arguments=args
-                ))
+        # Build list of candidate models starting with primary
+        models_to_try = [self.model_name]
+        for fb in self.fallback_models:
+            if fb not in models_to_try:
+                models_to_try.append(fb)
 
-        usage = TokenUsage()
-        if resp.usage:
-            usage.prompt_tokens = resp.usage.prompt_tokens
-            usage.completion_tokens = resp.usage.completion_tokens
-            usage.total_tokens = resp.usage.total_tokens
+        last_err = None
+        for m in models_to_try:
+            try:
+                resp = self.client.chat.completions.create(
+                    model=m,
+                    messages=messages,
+                    tools=tools if tools else None,
+                    temperature=0.1
+                )
+                self.model_name = m  # Keep successful model
+                choice = resp.choices[0]
+                msg = choice.message
 
-        return NormalizedResponse(
-            content=msg.content,
-            tool_calls=normalized_calls,
-            usage=usage,
-            model=self.model_name
-        )
+                normalized_calls = []
+                if msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        try:
+                            args = json.loads(tc.function.arguments)
+                        except Exception:
+                            args = {}
+                        normalized_calls.append(NormalizedToolCall(
+                            id=tc.id or f"call_{tc.function.name}",
+                            name=tc.function.name,
+                            arguments=args
+                        ))
+
+                usage = TokenUsage()
+                if resp.usage:
+                    usage.prompt_tokens = resp.usage.prompt_tokens
+                    usage.completion_tokens = resp.usage.completion_tokens
+                    usage.total_tokens = resp.usage.total_tokens
+
+                return NormalizedResponse(
+                    content=msg.content,
+                    tool_calls=normalized_calls,
+                    usage=usage,
+                    model=m
+                )
+            except NotFoundError as e:
+                print(f"[ModelAdapter] Notice: Model '{m}' returned 404 (Not Found). Testing next candidate...")
+                last_err = e
+                continue
+            except Exception as e:
+                # If error is a 404 in disguise or HTTP 404
+                if "404" in str(e):
+                    print(f"[ModelAdapter] Notice: Model '{m}' returned 404. Testing next candidate...")
+                    last_err = e
+                    continue
+                last_err = e
+                break
+
+        # If primary provider completely failed with 404, fallback to secondary (OpenAI)
+        if self.secondary_adapter:
+            sec_model = getattr(self.secondary_adapter, "model_name", "OpenAI")
+            print(f"[ModelAdapter] Gemini returned 404. Gracefully falling back to OpenAI ({sec_model}) [2nd Preference]...")
+            return self.secondary_adapter.generate(messages, tools)
+
+        if last_err:
+            raise last_err
+        raise RuntimeError("No model candidates succeeded.")
 
 class ClaudeAdapter(ModelAdapter):
     def __init__(self, api_key: str, model_name: str = "claude-3-5-sonnet-20241022"):
@@ -199,19 +242,26 @@ def get_model_adapter() -> ModelAdapter:
 
     # 1st Preference: Google Gemini (default)
     if provider == "gemini":
+        secondary = None
+        if openai_key:
+            sec_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+            secondary = OpenAIAdapter(api_key=openai_key, model_name=sec_model)
+
         if not gemini_key:
-            # Fall back to OpenAI if Gemini key missing
-            if openai_key:
+            if secondary:
                 print("[ModelAdapter] GEMINI_API_KEY not found, falling back to OpenAI (2nd Preference)")
-                model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-                return OpenAIAdapter(api_key=openai_key, model_name=model)
+                return secondary
             raise ValueError("MODEL_PROVIDER=gemini requested, but GEMINI_API_KEY is not set.")
-        model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+        model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        gemini_fallbacks = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]
         print(f"[ModelAdapter] Initializing Google Gemini ({model}) [1st Preference]")
         return OpenAIAdapter(
             api_key=gemini_key,
             model_name=model,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            fallback_models=gemini_fallbacks,
+            secondary_adapter=secondary
         )
 
     # 2nd Preference: OpenAI / ChatGPT
