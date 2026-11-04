@@ -12,7 +12,15 @@ from pathlib import Path
 agent_dir = Path(__file__).parent / "agent"
 sys.path.insert(0, str(agent_dir))
 
-from cli import run_cli
+try:
+    from cli import run_cli
+except ModuleNotFoundError as e:
+    if "openai" in str(e):
+        print("\n[!] Missing 'openai' package in active python environment.")
+        print("    Please run with:")
+        print("    uv run --with-requirements agent/requirements.txt python cli.py \"<your question>\"\n")
+        sys.exit(1)
+    raise
 
 if __name__ == "__main__":
     run_cli()

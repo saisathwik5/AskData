@@ -9,7 +9,6 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict, Any, List, Generator, Optional
-from openai import OpenAI
 
 from prompts import SYSTEM_PROMPT
 from context import build_system_prompt
