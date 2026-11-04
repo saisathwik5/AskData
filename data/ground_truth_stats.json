@@ -1,0 +1,12 @@
+{
+  "total_users": 2000,
+  "real_users": 1940,
+  "test_users": 60,
+  "total_payments": 13142,
+  "payments_succeeded": 11539,
+  "payments_failed": 1050,
+  "payments_refunded": 553,
+  "total_usd_net_revenue_real_users": 979773.0,
+  "total_eur_gross_real_users": 180406.0,
+  "total_events": 100000
+}

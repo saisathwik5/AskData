@@ -54,7 +54,8 @@ def escape_sql(val):
         return "TRUE" if val else "FALSE"
     if isinstance(val, (int, float, Decimal)):
         return str(val)
-    # String / JSON
+    if isinstance(val, datetime):
+        return f"'{val.isoformat()}'"
     val_str = str(val).replace("'", "''")
     return f"'{val_str}'"
 
@@ -242,22 +243,22 @@ with open(output_sql, "w", encoding="utf-8") as f:
     
     # Users
     for u in users:
-        f.write(f"INSERT INTO users VALUES ({escape_sql(u['id'])}, {escape_sql(u['email'])}, {escape_sql(u['full_name'])}, {escape_sql(u['country'])}, '{u['signup_date'].isoformat()}', {escape_sql(u['plan'])}, {escape_sql(u['is_test_account'])});\n")
+        f.write(f"INSERT INTO users VALUES ({escape_sql(u['id'])}, {escape_sql(u['email'])}, {escape_sql(u['full_name'])}, {escape_sql(u['country'])}, {escape_sql(u['signup_date'])}, {escape_sql(u['plan'])}, {escape_sql(u['is_test_account'])});\n")
     
     # Subscriptions
     for s in subscriptions:
-        f.write(f"INSERT INTO subscriptions VALUES ({escape_sql(s['id'])}, {escape_sql(s['user_id'])}, {escape_sql(s['plan'])}, {escape_sql(s['status'])}, '{s['start_date'].isoformat()}', {'NULL' if not s['end_date'] else f'\'{s[\"end_date\"].isoformat()}\''}, {'NULL' if not s['trial_end_date'] else f'\'{s[\"trial_end_date\"].isoformat()}\''});\n")
+        f.write(f"INSERT INTO subscriptions VALUES ({escape_sql(s['id'])}, {escape_sql(s['user_id'])}, {escape_sql(s['plan'])}, {escape_sql(s['status'])}, {escape_sql(s['start_date'])}, {escape_sql(s['end_date'])}, {escape_sql(s['trial_end_date'])});\n")
         
     # Payments
     for p in payments:
-        f.write(f"INSERT INTO payments VALUES ({escape_sql(p['id'])}, {escape_sql(p['user_id'])}, {p['amount']}, {escape_sql(p['currency'])}, {escape_sql(p['status'])}, '{p['paid_at'].isoformat()}', {p['refunded_amount']});\n")
+        f.write(f"INSERT INTO payments VALUES ({escape_sql(p['id'])}, {escape_sql(p['user_id'])}, {p['amount']}, {escape_sql(p['currency'])}, {escape_sql(p['status'])}, {escape_sql(p['paid_at'])}, {p['refunded_amount']});\n")
 
     # Events in batches of 1000
     for chunk in range(0, len(events), 1000):
         batch = events[chunk:chunk + 1000]
         vals = []
         for e in batch:
-            vals.append(f"({escape_sql(e['id'])}, {escape_sql(e['user_id'])}, {escape_sql(e['event_name'])}, '{e['occurred_at'].isoformat()}', {escape_sql(e['properties'])})")
+            vals.append(f"({escape_sql(e['id'])}, {escape_sql(e['user_id'])}, {escape_sql(e['event_name'])}, {escape_sql(e['occurred_at'])}, {escape_sql(e['properties'])})")
         f.write(f"INSERT INTO events VALUES {', '.join(vals)};\n")
         
     f.write("\nCOMMIT;\n")
