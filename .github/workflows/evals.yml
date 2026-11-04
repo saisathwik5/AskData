@@ -1,0 +1,84 @@
+name: AskData Evaluation Benchmark CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'agent/**'
+      - 'guard/**'
+      - 'evals/**'
+      - '.github/workflows/evals.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Benchmark Mode (quick = 10 questions, full = 50 questions)'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - quick
+          - full
+      context:
+        description: 'Context Level'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - baseline
+          - metrics
+          - db_summary
+
+jobs:
+  guard-tests:
+    name: Run Java Guard Security Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Execute 38 AST Security Tests
+        working-directory: ./guard
+        run: mvn test
+
+  evals-benchmark:
+    name: Run AI Agent Evaluation Benchmark
+    needs: guard-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Run Evals Suite
+        working-directory: ./evals
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          MODE="${{ github.event.inputs.mode || 'quick' }}"
+          CONTEXT="${{ github.event.inputs.context || 'full' }}"
+          echo "Running evals in mode: $MODE with context: $CONTEXT"
+          ~/.local/bin/uv run --with-requirements ../agent/requirements.txt python runner.py --mode $MODE --context $CONTEXT
+
+      - name: Upload Scorecard Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: evals/results/

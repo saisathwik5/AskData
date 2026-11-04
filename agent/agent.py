@@ -12,7 +12,9 @@ from typing import Dict, Any, List, Generator, Optional
 from openai import OpenAI
 
 from prompts import SYSTEM_PROMPT
+from context import build_system_prompt
 from tools import TOOLS_SCHEMA, execute_tool
+from models import get_model_adapter, ModelAdapter, NormalizedResponse
 
 # Pricing per million tokens (USD)
 MODEL_PRICING = {
@@ -20,66 +22,43 @@ MODEL_PRICING = {
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
     "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
+    "gemini-2.5-flash": {"input": 0.10, "output": 0.40},
+    "claude-3-5-sonnet": {"input": 3.00, "output": 15.00},
 }
 
-def find_api_client():
-    """Initializes the OpenAI client using either OPENAI_API_KEY or GEMINI_API_KEY."""
-    # Check current environment, then .env files
-    openai_key = os.getenv("OPENAI_API_KEY")
-    gemini_key = os.getenv("GEMINI_API_KEY")
-
-    if not openai_key or not gemini_key:
-        possible_envs = [
-            Path(__file__).parent / ".env",
-            Path(__file__).parent.parent / ".env"
-        ]
-        for p in possible_envs:
-            if p.exists():
-                with open(p, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line.startswith("OPENAI_API_KEY=") and not openai_key:
-                            v = line.split("=", 1)[1].strip().strip('"').strip("'")
-                            if v and "sk-proj" in v:
-                                openai_key = v
-                        if line.startswith("GEMINI_API_KEY=") and not gemini_key:
-                            v = line.split("=", 1)[1].strip().strip('"').strip("'")
-                            if v and "AIza" in v:
-                                gemini_key = v
-
-    if openai_key:
-        return OpenAI(api_key=openai_key), "gpt-4o-mini"
-    elif gemini_key:
-        return OpenAI(
-            api_key=gemini_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-        ), "gemini-1.5-flash"
-    else:
-        raise ValueError("No API key found! Please set OPENAI_API_KEY or GEMINI_API_KEY in your .env file.")
-
 def calculate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
-    pricing = MODEL_PRICING.get(model_name, MODEL_PRICING["gpt-4o-mini"])
+    pricing = MODEL_PRICING.get(model_name, MODEL_PRICING["gemini-1.5-flash"])
     cost = (prompt_tokens / 1_000_000.0) * pricing["input"] + (completion_tokens / 1_000_000.0) * pricing["output"]
     return round(cost, 6)
 
 class AskDataAgent:
-    def __init__(self, model_name: Optional[str] = None):
-        self.client, default_model = find_api_client()
-        self.model_name = model_name or default_model
-        print(f"[AskDataAgent] Initialized using model: {self.model_name}")
+    def __init__(self, model_adapter: Optional[ModelAdapter] = None, context_level: str = "full", 
+                 user_role: str = "analyst", reference_date: str = "2025-06-30"):
+        self.adapter = model_adapter or get_model_adapter()
+        self.model_name = getattr(self.adapter, "model_name", "llm-agent")
+        self.context_level = context_level
+        self.user_role = user_role
+        self.reference_date = reference_date
+        print(f"[AskDataAgent] Initialized using adapter: {self.model_name} | Context: {self.context_level}")
 
     def run_step_by_step(self, question: str, user_id: str = "analyst-01", max_steps: int = 8) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
         """
         The Hand-Crafted Agent Loop:
-        1. Sends user question with system prompt & tool definitions.
+        1. Sends user question with system prompt (built from context layers) & tool definitions.
         2. Inspects model response:
            - If tool calls requested -> executes tool, feeds result back.
            - If text returned -> emits final answer / clarification.
         3. Enforces step limit (max_steps) and logs tokens/cost.
         Yields each step for live streaming (SSE/CLI).
         """
+        system_prompt = build_system_prompt(
+            context_level=self.context_level,
+            user_role=self.user_role,
+            reference_date=self.reference_date
+        )
+
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": question}
         ]
 
@@ -98,14 +77,11 @@ class AskDataAgent:
         }
 
         while step_number <= max_steps:
-            # Call the LLM
+            # Call the LLM through the unified adapter
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
+                response = self.adapter.generate(
                     messages=messages,
-                    tools=TOOLS_SCHEMA,
-                    tool_choice="auto",
-                    temperature=0.1
+                    tools=TOOLS_SCHEMA
                 )
             except Exception as e:
                 yield {
@@ -115,49 +91,51 @@ class AskDataAgent:
                 }
                 return
 
-            choice = response.choices[0]
-            msg = choice.message
             usage = response.usage
-
-            if usage:
-                p_tok = usage.prompt_tokens
-                c_tok = usage.completion_tokens
-                total_prompt_tokens += p_tok
-                total_completion_tokens += c_tok
-                step_cost = calculate_cost(self.model_name, p_tok, c_tok)
-            else:
-                p_tok, c_tok, step_cost = 0, 0, 0.0
+            p_tok = usage.prompt_tokens
+            c_tok = usage.completion_tokens
+            total_prompt_tokens += p_tok
+            total_completion_tokens += c_tok
+            step_cost = calculate_cost(self.model_name, p_tok, c_tok)
 
             # Check if model wants to call tools
-            if msg.tool_calls:
+            if response.tool_calls:
                 # Append assistant message with tool calls to conversation
-                messages.append(msg)
+                raw_tool_calls_dict = []
+                for tc in response.tool_calls:
+                    raw_tool_calls_dict.append({
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.name,
+                            "arguments": json.dumps(tc.arguments)
+                        }
+                    })
 
-                for tool_call in msg.tool_calls:
-                    fn_name = tool_call.function.name
-                    raw_args = tool_call.function.arguments
+                messages.append({
+                    "role": "assistant",
+                    "content": response.content,
+                    "tool_calls": raw_tool_calls_dict
+                })
 
-                    try:
-                        args = json.loads(raw_args)
-                    except Exception:
-                        args = {}
+                for tool_call in response.tool_calls:
+                    fn_name = tool_call.name
+                    args = tool_call.arguments
 
                     yield {
                         "type": "tool_call",
                         "step": step_number,
                         "tool": fn_name,
                         "arguments": args,
-                        "thought": msg.content or ""
+                        "thought": response.content or ""
                     }
 
                     # Execute the tool
                     result = execute_tool(fn_name, args, user_id=user_id, question=question)
 
-                    # If chart was created, store it
                     if fn_name == "make_chart":
                         charts_generated.append(result)
 
-                    # Check for guard error to track retries
                     if fn_name == "run_query" and isinstance(result, dict) and not result.get("success", True):
                         retries_count += 1
                         yield {
@@ -174,7 +152,6 @@ class AskDataAgent:
                         "result": result
                     }
 
-                    # Append tool result to messages
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
@@ -184,8 +161,7 @@ class AskDataAgent:
                 step_number += 1
 
             else:
-                # Model did not call a tool -> It has provided its final response (answer, clarification, or refusal)
-                final_answer = msg.content or ""
+                final_answer = response.content or ""
                 messages.append({"role": "assistant", "content": final_answer})
 
                 total_cost = calculate_cost(self.model_name, total_prompt_tokens, total_completion_tokens)

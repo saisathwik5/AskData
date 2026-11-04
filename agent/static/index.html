@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AskData | Guarded AI Analytics</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    code, pre { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 h-screen flex flex-col antialiased">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shadow-xs">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white text-lg shadow-sm">
+        <i class="fa-solid fa-database"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-slate-900 text-lg">AskData Analytics</h1>
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-shield-halved text-emerald-600"></i> Guard Port 8081 Active
+          </span>
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+            Google Gemini (1st Pref)
+          </span>
+        </div>
+        <p class="text-xs text-slate-500">AST Query Guard • Strict Analytical Views • Defense-in-Depth</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button onclick="openSchemaModal()" class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition">
+        <i class="fa-solid fa-book-open text-blue-600"></i>
+        <span>Data Dictionary</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Chat Container -->
+  <main class="flex-1 max-w-5xl w-full mx-auto flex flex-col bg-white border-x border-slate-200 shadow-sm overflow-hidden">
+    
+    <!-- Messages Scrollable List -->
+    <div id="messagesList" class="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-50">
+      
+      <!-- Welcome Message -->
+      <div class="flex gap-3">
+        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs flex-shrink-0 mt-1 shadow-sm">
+          <i class="fa-solid fa-robot"></i>
+        </div>
+        <div class="max-w-[85%] bg-white border border-slate-200 p-4 rounded-2xl rounded-tl-none shadow-xs text-sm text-slate-800 space-y-2">
+          <p class="font-semibold text-slate-900">👋 Welcome to AskData!</p>
+          <p>I am your guarded AI data analyst. You can ask me financial, subscription, or behavioral questions about your SaaS business. Every query is filtered by our secondary <strong>Java Query Guard (Port 8081)</strong> to prevent PII leakage and destructive operations.</p>
+          <div class="bg-blue-50 border border-blue-200 p-2.5 rounded-lg text-xs text-blue-800">
+            <strong>💡 Pro-tip:</strong> Try asking for <em>Monthly Recurring Revenue (MRR)</em>, <em>Net USD Revenue</em>, or ask for customer emails to verify the security block!
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Quick Sample Questions Bar -->
+    <div class="px-4 py-2 bg-slate-100 border-t border-slate-200 overflow-x-auto flex gap-2 text-xs">
+      <button onclick="askQuestion('What is our current Monthly Recurring Revenue (MRR) in USD?')" class="bg-white hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-full whitespace-nowrap shadow-2xs transition">
+        💵 What is our current MRR?
+      </button>
+      <button onclick="askQuestion('What is our total net revenue to date in USD?')" class="bg-white hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-full whitespace-nowrap shadow-2xs transition">
+        📈 Net Revenue in USD
+      </button>
+      <button onclick="askQuestion('Which 5 users have executed the highest number of queries?')" class="bg-white hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-full whitespace-nowrap shadow-2xs transition">
+        👥 Top 5 Query Users
+      </button>
+      <button onclick="askQuestion('How are we doing?')" class="bg-white hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-full whitespace-nowrap shadow-2xs transition">
+        ❓ Test Ambiguity Guard
+      </button>
+      <button onclick="askQuestion('SELECT email FROM users')" class="bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-full whitespace-nowrap shadow-2xs transition">
+        🛡️ Test PII Attack Block
+      </button>
+    </div>
+
+    <!-- Input Form -->
+    <div class="p-4 bg-white border-t border-slate-200">
+      <form id="chatForm" onsubmit="event.preventDefault(); submitChat();" class="flex gap-2">
+        <input 
+          id="chatInput" 
+          type="text" 
+          placeholder="Ask a question about SaaS metrics, subscriptions, payments, or usage..." 
+          class="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 focus:bg-white transition text-slate-900"
+          autocomplete="off"
+        />
+        <button 
+          id="submitBtn"
+          type="submit" 
+          class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-medium text-sm flex items-center gap-2 shadow-sm transition"
+        >
+          <span id="btnText">Ask</span>
+          <i id="btnIcon" class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </form>
+    </div>
+
+  </main>
+
+  <!-- Schema Dictionary Modal -->
+  <div id="schemaModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-database text-blue-600"></i>
+          <h2 class="font-bold text-slate-800">Database Schema Dictionary (Safe Analytical Views)</h2>
+        </div>
+        <button onclick="closeSchemaModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto space-y-6 text-sm">
+        <!-- v_users -->
+        <div class="border border-slate-200 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-mono font-bold text-blue-700">v_users</h3>
+            <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">PII Sanitized</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-3">Customer accounts view. Directly omits sensitive columns (email, full_name).</p>
+          <div class="bg-slate-50 p-2.5 rounded font-mono text-xs space-y-1 text-slate-700">
+            <div><span class="text-blue-600">id</span>: VARCHAR(36) PK UUID</div>
+            <div><span class="text-blue-600">country</span>: VARCHAR(2) ISO Country Code</div>
+            <div><span class="text-blue-600">signup_date</span>: TIMESTAMPTZ Registration Date</div>
+            <div><span class="text-blue-600">plan</span>: VARCHAR(50) Initial plan tier</div>
+            <div><span class="text-blue-600">is_test_account</span>: BOOLEAN (Exclude TRUE from revenue!)</div>
+          </div>
+        </div>
+
+        <!-- v_subscriptions -->
+        <div class="border border-slate-200 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-mono font-bold text-blue-700">v_subscriptions</h3>
+            <span class="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">2,037 rows</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-3">Subscription lifecycle statuses. Starter=$29, Pro=$99, Enterprise=$499.</p>
+          <div class="bg-slate-50 p-2.5 rounded font-mono text-xs space-y-1 text-slate-700">
+            <div><span class="text-blue-600">id</span>, <span class="text-blue-600">user_id</span>: UUIDs</div>
+            <div><span class="text-blue-600">plan</span>: starter ($29), pro ($99), enterprise ($499)</div>
+            <div><span class="text-blue-600">status</span>: active, canceled, trialing</div>
+            <div><span class="text-blue-600">start_date</span>, <span class="text-blue-600">end_date</span>: TIMESTAMPTZ</div>
+          </div>
+        </div>
+
+        <!-- v_payments -->
+        <div class="border border-slate-200 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-mono font-bold text-blue-700">v_payments</h3>
+            <span class="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">13,142 rows</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-3">Financial charges and refunds. Currencies: USD or EUR. Net = amount - refunded_amount.</p>
+          <div class="bg-slate-50 p-2.5 rounded font-mono text-xs space-y-1 text-slate-700">
+            <div><span class="text-blue-600">amount</span>: Gross charge amount</div>
+            <div><span class="text-blue-600">currency</span>: USD or EUR (Do NOT sum across currencies!)</div>
+            <div><span class="text-blue-600">status</span>: succeeded, failed, refunded</div>
+            <div><span class="text-blue-600">refunded_amount</span>: Deducted refund value</div>
+          </div>
+        </div>
+
+        <!-- v_events -->
+        <div class="border border-slate-200 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-mono font-bold text-blue-700">v_events</h3>
+            <span class="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">100,000 rows</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-3">Behavioral event log. event_name='query_executed' for query activity.</p>
+          <div class="bg-slate-50 p-2.5 rounded font-mono text-xs space-y-1 text-slate-700">
+            <div><span class="text-blue-600">event_name</span>: page_view, dashboard_viewed, query_executed</div>
+            <div><span class="text-blue-600">occurred_at</span>: TIMESTAMPTZ</div>
+            <div><span class="text-blue-600">properties</span>: JSONB (execution_ms, browser)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+        <button onclick="closeSchemaModal()" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function openSchemaModal() { document.getElementById('schemaModal').classList.remove('hidden'); }
+    function closeSchemaModal() { document.getElementById('schemaModal').classList.add('hidden'); }
+
+    function askQuestion(q) {
+      document.getElementById('chatInput').value = q;
+      submitChat();
+    }
+
+    async function submitChat() {
+      const input = document.getElementById('chatInput');
+      const question = input.value.trim();
+      if (!question) return;
+
+      input.value = '';
+      const list = document.getElementById('messagesList');
+      const submitBtn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('btnText');
+      const btnIcon = document.getElementById('btnIcon');
+
+      // Append user message
+      const userHtml = `
+        <div class="flex gap-3 justify-end">
+          <div class="max-w-[85%] bg-blue-600 text-white p-4 rounded-2xl rounded-tr-none shadow-xs text-sm">
+            ${escapeHtml(question)}
+          </div>
+          <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-white text-xs flex-shrink-0 mt-1 shadow-sm">
+            <i class="fa-solid fa-user"></i>
+          </div>
+        </div>
+      `;
+      list.insertAdjacentHTML('beforeend', userHtml);
+
+      // Append agent placeholder
+      const msgId = 'msg_' + Date.now();
+      const agentHtml = `
+        <div id="${msgId}" class="flex gap-3 justify-start">
+          <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs flex-shrink-0 mt-1 shadow-sm">
+            <i class="fa-solid fa-robot"></i>
+          </div>
+          <div class="max-w-[85%] bg-white border border-slate-200 p-4 rounded-2xl rounded-tl-none shadow-xs text-sm text-slate-800 space-y-3">
+            <div id="${msgId}_text" class="text-slate-500 italic animate-pulse">
+              <i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i> Interpreting question and querying guard...
+            </div>
+            <div id="${msgId}_chartContainer"></div>
+            <div id="${msgId}_stepsContainer"></div>
+          </div>
+        </div>
+      `;
+      list.insertAdjacentHTML('beforeend', agentHtml);
+      list.scrollTop = list.scrollHeight;
+
+      // Disable button
+      submitBtn.disabled = true;
+      btnText.innerText = 'Analyzing';
+      btnIcon.className = 'fa-solid fa-spinner fa-spin text-xs';
+
+      let accumulatedSteps = [];
+      let finalAnswer = '';
+      let metrics = null;
+      let charts = [];
+
+      try {
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: question, userId: 'analyst-web' })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          const textChunk = decoder.decode(value);
+          const lines = textChunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const payloadStr = line.slice(6).trim();
+              if (payloadStr === '[DONE]') break;
+
+              try {
+                const event = JSON.parse(payloadStr);
+                accumulatedSteps.push(event);
+
+                if (event.type === 'tool_call') {
+                  document.getElementById(`${msgId}_text`).innerHTML = `
+                    <div class="text-xs text-blue-600 font-mono">
+                      <i class="fa-solid fa-gear fa-spin mr-1"></i> Executing tool <strong>${event.tool}</strong>...
+                    </div>
+                  `;
+                }
+
+                if (event.type === 'final_answer') {
+                  finalAnswer = event.answer || '';
+                  metrics = event.metrics;
+                  charts = event.charts || [];
+                } else if (event.type === 'error') {
+                  finalAnswer = `⚠️ Error: ${event.message}`;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+        // Render final answer
+        const textElem = document.getElementById(`${msgId}_text`);
+        textElem.className = 'text-slate-800 whitespace-pre-wrap leading-relaxed';
+        textElem.innerHTML = formatMarkdown(finalAnswer);
+
+        // Render charts if any
+        if (charts && charts.length > 0) {
+          const chartCont = document.getElementById(`${msgId}_chartContainer`);
+          for (let i = 0; i < charts.length; i++) {
+            renderChart(chartCont, charts[i], `${msgId}_canvas_${i}`);
+          }
+        }
+
+        // Render collapsible steps
+        renderStepsDrawer(`${msgId}_stepsContainer`, accumulatedSteps, metrics);
+
+      } catch (err) {
+        const textElem = document.getElementById(`${msgId}_text`);
+        textElem.className = 'text-rose-600 bg-rose-50 p-3 rounded-lg border border-rose-200 text-xs';
+        textElem.innerHTML = `<strong>Error connecting to agent:</strong> ${err.message}`;
+      } finally {
+        submitBtn.disabled = false;
+        btnText.innerText = 'Ask';
+        btnIcon.className = 'fa-solid fa-paper-plane text-xs';
+        list.scrollTop = list.scrollHeight;
+      }
+    }
+
+    function renderStepsDrawer(containerId, steps, metrics) {
+      const container = document.getElementById(containerId);
+      if (!steps || steps.length === 0) return;
+
+      const drawerId = 'drawer_' + Date.now();
+      let stepsHtml = '';
+
+      for (let st of steps) {
+        if (st.type === 'tool_call') {
+          stepsHtml += `
+            <div class="bg-white p-2.5 rounded border border-slate-200 text-xs">
+              <div class="font-semibold text-blue-700 mb-1">Step ${st.step}: Calling ${st.tool}</div>
+              ${st.tool === 'run_query' && st.arguments?.sql ? `
+                <div class="bg-slate-900 text-emerald-400 p-2 rounded font-mono overflow-x-auto text-[11px]">${escapeHtml(st.arguments.sql)}</div>
+              ` : `
+                <div class="bg-slate-50 p-1.5 rounded font-mono text-[11px] text-slate-600">${escapeHtml(JSON.stringify(st.arguments))}</div>
+              `}
+            </div>
+          `;
+        } else if (st.type === 'tool_result') {
+          const res = st.result;
+          const isSuccess = res?.success !== false;
+          stepsHtml += `
+            <div class="pl-3 border-l-2 ${isSuccess ? 'border-emerald-400' : 'border-rose-400'} text-xs">
+              <span class="${isSuccess ? 'text-emerald-700' : 'text-rose-700'} font-semibold">
+                ${isSuccess ? '✓ Guard Approved' : '✗ Guard Blocked'} (${res?.executionTimeMs || 0}ms)
+              </span>
+              ${res?.rows ? `<div class="text-[10px] text-slate-500 font-mono mt-0.5">${res.rowCount} rows returned</div>` : ''}
+              ${res?.error ? `<div class="text-[11px] text-rose-600 font-mono mt-0.5">${escapeHtml(res.error)}</div>` : ''}
+            </div>
+          `;
+        }
+      }
+
+      container.innerHTML = `
+        <div class="border border-slate-200 rounded-lg overflow-hidden bg-slate-50 mt-3 text-xs">
+          <button onclick="document.getElementById('${drawerId}').classList.toggle('hidden')" class="w-full px-3 py-2 flex items-center justify-between bg-slate-100 hover:bg-slate-200 transition font-medium text-slate-700">
+            <span class="flex items-center gap-1.5">
+              <i class="fa-solid fa-microchip text-blue-600"></i> Show Agent Reasoning (${steps.length} events)
+              ${metrics ? `<span class="text-slate-400 font-normal ml-2">• ${metrics.total_tokens} tokens ($${metrics.estimated_cost_usd.toFixed(5)})</span>` : ''}
+            </span>
+            <i class="fa-solid fa-chevron-down text-slate-400"></i>
+          </button>
+          <div id="${drawerId}" class="p-3 space-y-2 hidden divide-y divide-slate-200">
+            ${stepsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderChart(container, spec, canvasId) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'my-3 p-3 border border-slate-200 rounded-xl bg-white shadow-2xs';
+      wrapper.innerHTML = `
+        <div class="font-semibold text-xs text-slate-700 mb-2">${escapeHtml(spec.title || 'Chart')}</div>
+        <div class="h-56"><canvas id="${canvasId}"></canvas></div>
+      `;
+      container.appendChild(wrapper);
+
+      setTimeout(() => {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const labels = spec.data.map(d => d[spec.x_axis]);
+        const values = spec.data.map(d => d[spec.y_axis]);
+
+        new Chart(ctx, {
+          type: spec.chart_type === 'line' ? 'line' : spec.chart_type === 'pie' ? 'pie' : 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: spec.y_axis,
+              data: values,
+              backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+              borderRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: spec.chart_type === 'pie' } }
+          }
+        });
+      }, 50);
+    }
+
+    function formatMarkdown(text) {
+      if (!text) return '';
+      return escapeHtml(text)
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code class="bg-slate-100 text-blue-700 px-1 py-0.5 rounded font-mono text-xs">$1</code>');
+    }
+
+    function escapeHtml(string) {
+      if (!string) return '';
+      return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

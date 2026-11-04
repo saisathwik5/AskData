@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  # 1. Java Query Guard (Port 8081)
+  guard:
+    build:
+      context: ./guard
+      dockerfile: Dockerfile
+    container_name: askdata-guard
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+      - SUPABASE_READONLY_URL=${SUPABASE_READONLY_URL}
+      - SUPABASE_READONLY_USER=${SUPABASE_READONLY_USER}
+      - SUPABASE_READONLY_PASSWORD=${SUPABASE_READONLY_PASSWORD}
+    env_file:
+      - .env
+
+  # 2. Python Analytics Agent & Web API (Port 8000)
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: askdata-agent
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - GUARD_SERVICE_URL=http://guard:8081
+      - MODEL_PROVIDER=${MODEL_PROVIDER:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    env_file:
+      - .env
+    depends_on:
+      - guard

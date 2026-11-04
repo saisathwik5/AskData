@@ -7,13 +7,16 @@ Enables real-time step inspection for the Next.js UI and eval runner.
 import json
 import asyncio
 from typing import Optional
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 
 from agent import AskDataAgent
 from tools import run_query
+
+STATIC_INDEX = Path(__file__).parent / "static" / "index.html"
 
 app = FastAPI(
     title="AskData Agent API",
@@ -29,6 +32,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+def serve_index():
+    """Serves the interactive web analytics UI directly from the FastAPI server."""
+    if STATIC_INDEX.exists():
+        return FileResponse(STATIC_INDEX)
+    return {"status": "ok", "message": "AskData Agent backend active."}
 
 # Lazily initialized agent
 _agent_instance: Optional[AskDataAgent] = None

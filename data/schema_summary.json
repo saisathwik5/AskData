@@ -1,0 +1,172 @@
+{
+  "views": [
+    {
+      "name": "v_users",
+      "description": "Safe view of all registered SaaS user accounts. Sensitive PII columns ('email' and 'full_name') are intentionally excluded for compliance and privacy.",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "description": "Unique identifier (UUID) for each registered user. Serves as primary key.",
+          "sample_values": ["335a5132-cfaa-4919-b6b8-8a71c958f3cb", "e93b1fef-81bc-4b07-bca1-84dea767e68d"]
+        },
+        {
+          "name": "country",
+          "type": "VARCHAR(2)",
+          "description": "Two-letter ISO 3166-1 alpha-2 country code. Can be NULL if not provided during registration.",
+          "sample_values": ["US", "CA", "DE", null]
+        },
+        {
+          "name": "signup_date",
+          "type": "TIMESTAMPTZ",
+          "description": "Timestamp with timezone recording when the user registered.",
+          "sample_values": ["2024-01-15T10:30:00Z", "2024-06-20T18:45:00Z"]
+        },
+        {
+          "name": "plan",
+          "type": "VARCHAR(50)",
+          "description": "The initial plan selected at registration: 'starter', 'pro', or 'enterprise'.",
+          "sample_values": ["starter", "pro", "enterprise"]
+        },
+        {
+          "name": "is_test_account",
+          "type": "BOOLEAN",
+          "description": "CRITICAL: Boolean flag marking internal test/staging accounts. MUST be filtered out (is_test_account = FALSE) for all business metrics, revenue, and active user analytics.",
+          "sample_values": [false, true]
+        }
+      ]
+    },
+    {
+      "name": "v_subscriptions",
+      "description": "Customer recurring subscription contracts, lifecycle statuses, and trial periods.",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "description": "Unique subscription contract identifier (UUID).",
+          "sample_values": ["s-1001", "s-1002"]
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(36)",
+          "description": "Foreign key linking subscription to v_users.id.",
+          "sample_values": ["335a5132-cfaa-4919-b6b8-8a71c958f3cb"]
+        },
+        {
+          "name": "plan",
+          "type": "VARCHAR(50)",
+          "description": "Contract tier: 'starter' ($29/mo), 'pro' ($99/mo), 'enterprise' ($499/mo). Used to compute MRR.",
+          "sample_values": ["starter", "pro", "enterprise"]
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(50)",
+          "description": "Current lifecycle status: 'active' (currently paying), 'canceled' (churned), or 'trialing' (free trial).",
+          "sample_values": ["active", "canceled", "trialing"]
+        },
+        {
+          "name": "start_date",
+          "type": "TIMESTAMPTZ",
+          "description": "Start timestamp of the subscription contract.",
+          "sample_values": ["2024-02-01T00:00:00Z"]
+        },
+        {
+          "name": "end_date",
+          "type": "TIMESTAMPTZ",
+          "description": "Cancellation timestamp for churned subscriptions. NULL for actively running subscriptions.",
+          "sample_values": [null, "2024-08-01T00:00:00Z"]
+        },
+        {
+          "name": "trial_end_date",
+          "type": "TIMESTAMPTZ",
+          "description": "Timestamp when the 14-day free trial concluded.",
+          "sample_values": ["2024-02-15T00:00:00Z"]
+        }
+      ]
+    },
+    {
+      "name": "v_payments",
+      "description": "Financial ledger of all billed credit card transactions, currencies, charges, and refunds.",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "description": "Unique transaction charge identifier (UUID).",
+          "sample_values": ["p-501", "p-502"]
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(36)",
+          "description": "Foreign key linking payment to v_users.id.",
+          "sample_values": ["335a5132-cfaa-4919-b6b8-8a71c958f3cb"]
+        },
+        {
+          "name": "amount",
+          "type": "NUMERIC(10,2)",
+          "description": "Gross billed transaction amount. Never use floating point.",
+          "sample_values": [29.00, 99.00, 499.00]
+        },
+        {
+          "name": "currency",
+          "type": "VARCHAR(3)",
+          "description": "CRITICAL: Multi-currency column ('USD' vs 'EUR'). NEVER sum amounts without filtering or grouping by currency.",
+          "sample_values": ["USD", "EUR"]
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(50)",
+          "description": "Payment outcome: 'succeeded' (collected revenue), 'failed' (declined), or 'refunded'.",
+          "sample_values": ["succeeded", "failed", "refunded"]
+        },
+        {
+          "name": "paid_at",
+          "type": "TIMESTAMPTZ",
+          "description": "Timestamp when the payment was settled.",
+          "sample_values": ["2024-04-10T12:00:00Z"]
+        },
+        {
+          "name": "refunded_amount",
+          "type": "NUMERIC(10,2)",
+          "description": "Amount refunded to customer. Net Revenue = SUM(amount - COALESCE(refunded_amount, 0)) for succeeded charges.",
+          "sample_values": [0.00, 99.00, 49.50]
+        }
+      ]
+    },
+    {
+      "name": "v_events",
+      "description": "Product telemetry and behavioral event stream tracking user engagement (100,000 rows).",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "description": "Unique event tracking ID.",
+          "sample_values": ["e-9001"]
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(36)",
+          "description": "Foreign key linking event to v_users.id.",
+          "sample_values": ["335a5132-cfaa-4919-b6b8-8a71c958f3cb"]
+        },
+        {
+          "name": "event_name",
+          "type": "VARCHAR(100)",
+          "description": "Intentional actions: 'dashboard_viewed', 'query_executed', 'report_exported'. Passive actions: 'page_view', 'settings_updated'.",
+          "sample_values": ["query_executed", "dashboard_viewed", "report_exported", "page_view"]
+        },
+        {
+          "name": "occurred_at",
+          "type": "TIMESTAMPTZ",
+          "description": "Timestamp when the user took the action.",
+          "sample_values": ["2024-05-18T22:15:00Z"]
+        },
+        {
+          "name": "properties",
+          "type": "JSONB",
+          "description": "JSON metadata. For 'query_executed', contains execution_ms. For 'report_exported', contains format.",
+          "sample_values": ["{\"browser\": \"Chrome\", \"execution_ms\": 82}", "{\"format\": \"csv\"}"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "askdata-analytics": {
+      "command": "python",
+      "args": [
+        "C:\\Users\\Sai Sathwik\\OneDrive\\Desktop\\job apps\\project\\AskData\\mcp\\server.py"
+      ],
+      "env": {
+        "GUARD_SERVICE_URL": "http://localhost:8081"
+      }
+    }
+  }
+}
