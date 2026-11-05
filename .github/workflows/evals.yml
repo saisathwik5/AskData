@@ -72,6 +72,12 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          if [ -z "$GEMINI_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
+            echo "⚠️ Notice: Neither GEMINI_API_KEY nor OPENAI_API_KEY is configured in GitHub Repository Secrets."
+            echo "To enable automated LLM benchmarking on every push, add GEMINI_API_KEY under: Repository Settings -> Secrets and variables -> Actions."
+            echo "Skipping live LLM evals in CI for now."
+            exit 0
+          fi
           MODE="${{ github.event.inputs.mode || 'quick' }}"
           CONTEXT="${{ github.event.inputs.context || 'full' }}"
           echo "Running evals in mode: $MODE with context: $CONTEXT"
