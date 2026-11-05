@@ -1,7 +1,7 @@
 # AskData: Enterprise AI Text-to-SQL with AST Query Guard
 
 > **A production-grade, defense-in-depth conversational data analytics platform.**  
-> Features a hand-crafted Python agent loop, multi-model adapter (**Google Gemini 1st preference**, OpenAI ChatGPT 2nd), a dedicated **Java Spring Boot AST Query Guard**, full **Model Context Protocol (MCP)** support, and progressive context layers.
+> Features a hand-crafted Python agent loop, multi-model adapter, a dedicated **Java Spring Boot AST Query Guard**, full **Model Context Protocol (MCP)** support, and progressive context layers.
 
 ---
 
