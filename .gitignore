@@ -19,10 +19,12 @@ target/
 .gradle/
 build/
 
-# Node (Next.js)
+# Node (Next.js & Mobile)
 node_modules/
 .next/
 out/
+.expo/
+web-build/
 
 # IDE & OS
 .DS_Store
